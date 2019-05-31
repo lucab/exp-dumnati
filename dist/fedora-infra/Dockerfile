@@ -1,5 +1,4 @@
-# build environment
-FROM fedora:30 AS build-env
+FROM fedora:30
 
 # build: system utilities and libraries
 RUN dnf -y install g++ openssl-devel
@@ -11,10 +10,11 @@ RUN ./install.sh
 
 # build: release binary
 ADD . /src
-RUN cd /src && cargo build --release
+RUN cd /src && cargo build --release && mv /src/target/release/dumnati /usr/local/bin/dumnati
 
-# run environment
-FROM fedora:30
+# build: cleanup
+RUN cd /src && cargo clean
+
+# run: default config
 WORKDIR /
-COPY --from=build-env /src/target/release/dumnati /usr/local/bin/dumnati
 CMD [ "/usr/local/bin/dumnati" ]
