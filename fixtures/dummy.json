@@ -1,5 +1,5 @@
 {
-  "version": "dummy",
+  "version": "target-version",
   "metadata": {},
   "payload": "dummy-digest"
 }

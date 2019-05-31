@@ -54,19 +54,19 @@ pub(crate) fn serve_graph(
 ) -> Box<Future<Item = HttpResponse, Error = Error>> {
     // Get current client version.
     let param = &req.state().param;
-    let version = match req.query().get(param) {
+    let os = match req.query().get(param) {
         None => {
             return Box::new(future::ok(HttpResponse::BadRequest().finish()));
         }
         Some(v) => v.to_string(),
     };
-    trace!("request from client at version {}", version);
+    trace!("client request, running OS: {}", os);
 
     // Assemble a simple graph.
     let current = CincinnatiPayload {
-        version,
+        version: "client-os-version".to_string(),
+        payload: os,
         metadata: HashMap::new(),
-        payload: String::new(),
     };
     let next = req.state().payload.clone();
     let graph = Graph {
@@ -99,7 +99,7 @@ pub(crate) struct CliOptions {
     port: u16,
 
     /// Client parameter for current version.
-    #[structopt(short = "c", long = "client-parameter", default_value = "current_version")]
+    #[structopt(short = "c", long = "client-parameter", default_value = "current_os")]
     client_param: String,
 
     /// Path to release payload.
