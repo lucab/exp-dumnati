@@ -36,7 +36,7 @@ fn main() -> Fallible<()> {
             .middleware(Logger::default())
             .route("/v1/graph", Method::GET, serve_graph)
     })
-    .bind((IpAddr::from(Ipv4Addr::LOCALHOST), port))?
+    .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), port))?
     .start();
 
     sys.run();
