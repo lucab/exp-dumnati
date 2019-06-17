@@ -5,6 +5,8 @@ extern crate failure;
 extern crate futures;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate maplit;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
@@ -66,7 +68,9 @@ pub(crate) fn serve_graph(
     let current = CincinnatiPayload {
         version: "client-os-version".to_string(),
         payload: os,
-        metadata: HashMap::new(),
+        metadata: hashmap!{
+            "org.fedoraproject.coreos.scheme".to_string() => "checksum".to_string(),
+        },
     };
     let next = req.state().payload.clone();
     let graph = Graph {
