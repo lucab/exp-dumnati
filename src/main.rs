@@ -12,13 +12,14 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate structopt;
 
+mod graph;
+mod scraper;
+
+use actix::prelude::*;
 use actix_web::{http::Method, middleware::Logger, server, App};
 use actix_web::{HttpRequest, HttpResponse};
 use failure::{Error, Fallible};
-use futures::future;
 use futures::prelude::*;
-use serde_derive::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use structopt::StructOpt;
 
@@ -29,9 +30,11 @@ fn main() -> Fallible<()> {
     trace!("starting with config: {:#?}", opts);
 
     let sys = actix::System::new("dumnati");
-    let (port, param, path) = opts.split();
-    let payload = CincinnatiPayload::from_file(path)?;
-    let app_state = AppState { param, payload };
+    let (port, _param, _path) = opts.split();
+
+    let scraper_addr = scraper::Scraper::new("testing")?.start();
+
+    let app_state = AppState { scraper_addr };
 
     server::new(move || {
         App::with_state(app_state.clone())
@@ -47,53 +50,27 @@ fn main() -> Fallible<()> {
 
 #[derive(Clone, Debug)]
 pub(crate) struct AppState {
-    param: String,
-    payload: CincinnatiPayload,
+    scraper_addr: Addr<scraper::Scraper>,
 }
 
 pub(crate) fn serve_graph(
     req: HttpRequest<AppState>,
 ) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    // Get current client version.
-    let param = &req.state().param;
-    let os = match req.query().get(param) {
-        None => {
-            return Box::new(future::ok(HttpResponse::BadRequest().finish()));
-        }
-        Some(v) => v.to_string(),
-    };
-    trace!("client request, running OS: {}", os);
-
-    // Assemble a simple graph.
-    let current = CincinnatiPayload {
-        version: "client-os-version".to_string(),
-        payload: os,
-        metadata: hashmap!{
-            "org.fedoraproject.coreos.scheme".to_string() => "checksum".to_string(),
-        },
-    };
-    let next = req.state().payload.clone();
-    let graph = Graph {
-        nodes: vec![current, next],
-        edges: vec![(0, 1)],
-    };
-
-    // Return the graph as JSON.
-    let resp = future::result(serde_json::to_string_pretty(&graph))
-        .from_err()
+    let resp = req
+        .state()
+        .scraper_addr
+        .send(scraper::GetCachedGraph::default())
+        .flatten()
+        .and_then(|graph| {
+            serde_json::to_string_pretty(&graph).map_err(|e| failure::format_err!("{}", e))
+        })
         .map(|json| {
-        HttpResponse::Ok()
-            .content_type("application/json")
-            .body(json)
-    });
+            HttpResponse::Ok()
+                .content_type("application/json")
+                .body(json)
+        });
 
     Box::new(resp)
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct Graph {
-    pub(crate) nodes: Vec<CincinnatiPayload>,
-    pub(crate) edges: Vec<(u64, u64)>,
 }
 
 #[derive(Debug, StructOpt)]
@@ -114,20 +91,5 @@ pub(crate) struct CliOptions {
 impl CliOptions {
     pub(crate) fn split(self) -> (u16, String, String) {
         (self.port, self.client_param, self.payload)
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct CincinnatiPayload {
-    pub(crate) version: String,
-    pub(crate) metadata: HashMap<String, String>,
-    pub(crate) payload: String,
-}
-
-impl CincinnatiPayload {
-    pub(crate) fn from_file<S: AsRef<str>>(path: S) -> Fallible<Self> {
-        let fp = std::fs::File::open(path.as_ref())?;
-        let payload = serde_json::from_reader(fp)?;
-        Ok(payload)
     }
 }
