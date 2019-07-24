@@ -41,20 +41,8 @@ impl Graph {
             nodes.push(current);
         }
 
-        // Synthesize a linear update graph.
-        let edges = nodes
-            .iter()
-            .enumerate()
-            .rev()
-            .filter_map(|(i, _)| {
-                let pos = i as u64;
-                if pos > 0 {
-                    Some((pos.saturating_sub(1), pos))
-                } else {
-                    None
-                }
-            })
-            .collect();
+        // Synthesize an empty update graph.
+        let edges = vec![];
 
         let graph = Graph { nodes, edges };
         Ok(graph)
