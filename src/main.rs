@@ -23,13 +23,12 @@ use actix_web::{http::Method, middleware::Logger, server, App};
 use actix_web::{HttpRequest, HttpResponse};
 use failure::{Error, Fallible};
 use futures::prelude::*;
-use lazy_static::lazy_static;
 use prometheus::IntCounter;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use structopt::StructOpt;
 
-lazy_static! {
+lazy_static::lazy_static! {
     static ref V1_GRAPH_INCOMING_REQS: IntCounter = register_int_counter!(opts!(
         "dumnati_v1_graph_incoming_requests_total",
         "Total number of incoming HTTP client request to /v1/graph"

@@ -3,12 +3,29 @@ use actix::prelude::*;
 use failure::{Error, Fallible};
 use futures::future;
 use futures::prelude::*;
+use prometheus::{IntCounter, IntGauge};
 use reqwest::Method;
 use serde_derive::Deserialize;
 
 /// Templated URL for release index.
 static RELEASES_JSON: &str =
     "https://builds.coreos.fedoraproject.org/prod/streams/${stream}/releases.json";
+
+lazy_static::lazy_static! {
+    static ref GRAPH_FINAL_RELEASES: IntGauge = register_int_gauge!(opts!(
+        "dumnati_scraper_graph_final_releases",
+        "Number of releases in the final graph, after processing"
+    )).unwrap();
+    static ref LAST_REFRESH: IntGauge = register_int_gauge!(opts!(
+        "dumnati_scraper_graph_last_refresh_timestamp",
+        "UTC timestamp of last graph refresh"
+    )).unwrap();
+    static ref UPSTREAM_SCRAPES: IntCounter = register_int_counter!(opts!(
+        "dumnati_scraper_upstream_scrapes_total",
+        "Total number of upstream scrapes"
+    ))
+    .unwrap();
+}
 
 /// Fedora CoreOS release index
 #[derive(Deserialize)]
@@ -88,6 +105,8 @@ impl Handler<RefreshTick> for Scraper {
     type Result = ResponseActFuture<Self, (), Error>;
 
     fn handle(&mut self, _msg: RefreshTick, ctx: &mut Self::Context) -> Self::Result {
+        UPSTREAM_SCRAPES.inc();
+
         let update_graph = self
             .fetch_releases()
             .and_then(|releases| graph::Graph::from_releases(releases));
@@ -96,6 +115,9 @@ impl Handler<RefreshTick> for Scraper {
             .map_err(|err, _actor, _ctx| log::error!("{}", err))
             .map(|graph, actor, _ctx| {
                 actor.graph = graph;
+                let refresh_timestamp = chrono::Utc::now();
+                LAST_REFRESH.set(refresh_timestamp.timestamp());
+                GRAPH_FINAL_RELEASES.set(actor.graph.nodes.len() as i64)
             })
             .then(|_r, _actor, ctx| {
                 Self::tick_later(ctx, std::time::Duration::from_secs(30));
