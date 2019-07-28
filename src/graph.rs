@@ -1,4 +1,4 @@
-use crate::scraper::Release;
+use crate::scraper::{Release, Updates};
 use failure::Fallible;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -26,20 +26,41 @@ impl Default for Graph {
 }
 
 impl Graph {
-    pub fn from_releases(releases: Vec<Release>) -> Fallible<Self> {
-        let mut nodes = Vec::with_capacity(releases.len());
-        for entry in releases {
-            // XXX(lucab): may panic, this should match on arch instead.
-            let payload = entry.commits[0].checksum.clone();
-            let current = CincinnatiPayload {
-                version: entry.version,
-                payload,
-                metadata: hashmap! {
-                    "org.fedoraproject.coreos.scheme".to_string() => "checksum".to_string(),
-                },
-            };
-            nodes.push(current);
-        }
+    pub fn from_metadata(releases: Vec<Release>, updates: Updates) -> Fallible<Self> {
+        let nodes = releases
+            .into_iter()
+            .scan(String::new(), |parent, entry| {
+                // XXX(lucab): may panic, this should match on arch instead.
+                let payload = entry.commits[0].checksum.clone();
+                let mut current = CincinnatiPayload {
+                    version: entry.version,
+                    payload,
+                    metadata: hashmap! {
+                        "org.fedoraproject.coreos.scheme".to_string() => "checksum".to_string(),
+                    },
+                };
+                // Augment with child->parent metadata.
+                if !parent.is_empty() {
+                    current.metadata.insert(
+                        "org.fedoraproject.coreos.metadata.releases.parent_version".to_string(),
+                        parent.to_string(),
+                    );
+                }
+                // Augment with deadends metadata.
+                if let Some(reason) = deadend_reason(&updates, &current) {
+                    current.metadata.insert(
+                        "org.fedoraproject.coreos.metadata.stream.deadend".to_string(),
+                        true.to_string(),
+                    );
+                    current.metadata.insert(
+                        "org.fedoraproject.coreos.metadata.stream.deadend.reason".to_string(),
+                        reason,
+                    );
+                }
+                *parent = current.version.clone();
+                Some(current)
+            })
+            .collect();
 
         // Synthesize an empty update graph.
         let edges = vec![];
@@ -47,4 +68,18 @@ impl Graph {
         let graph = Graph { nodes, edges };
         Ok(graph)
     }
+}
+
+fn deadend_reason(updates: &Updates, release: &CincinnatiPayload) -> Option<String> {
+    updates.deadends.iter().find_map(|dead| {
+        if dead.version != release.version {
+            return None;
+        }
+
+        if dead.reason.is_empty() {
+            return Some(String::from("generic"));
+        }
+
+        Some(dead.reason.clone())
+    })
 }
