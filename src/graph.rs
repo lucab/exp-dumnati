@@ -41,6 +41,7 @@ impl Graph {
                         "org.fedoraproject.coreos.metadata.releases.age_index".to_string() => age_index.to_string(),
                     },
                 };
+
                 // Augment with dead-ends metadata.
                 if let Some(reason) = deadend_reason(&updates, &current) {
                     current.metadata.insert(
@@ -52,6 +53,15 @@ impl Graph {
                         reason,
                     );
                 }
+
+                // Augment with rollout throttling.
+                if let Some(throttling) = compute_throttling(&updates, &current) {
+                    current.metadata.insert(
+                        "org.fedoraproject.coreos.metadata.stream.throttling".to_string(),
+                        throttling,
+                    );
+                }
+
                 current
             })
             .collect();
@@ -75,5 +85,15 @@ fn deadend_reason(updates: &Updates, release: &CincinnatiPayload) -> Option<Stri
         }
 
         Some(dead.reason.clone())
+    })
+}
+
+fn compute_throttling(updates: &Updates, release: &CincinnatiPayload) -> Option<String> {
+    updates.rollouts.iter().find_map(|rollout| {
+        if rollout.version != release.version {
+            return None;
+        }
+
+        rollout.policy.compute_throttling()
     })
 }

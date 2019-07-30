@@ -78,6 +78,7 @@ pub struct UpdateDeadend {
 pub struct UpdateRollout {
     pub version: String,
     pub pauses: Vec<RolloutPause>,
+    #[serde(default)]
     pub policy: RolloutPolicy,
 }
 
@@ -90,21 +91,46 @@ pub struct RolloutPause {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind")]
 pub enum RolloutPolicy {
+    #[serde(rename = "default")]
+    Default(PolicyDefault),
     #[serde(rename = "manual")]
     Manual(PolicyManual),
     #[serde(rename = "linear")]
     Linear(PolicyLinear),
 }
 
-#[derive(Debug, Deserialize)]
-pub struct PolicyManual {
-    pub throttling: f32,
+impl RolloutPolicy {
+    pub fn compute_throttling(&self) -> Option<String> {
+        let throttling = match &self {
+            RolloutPolicy::Default(_) => 1.0,
+            RolloutPolicy::Manual(pm) => pm.throttling,
+            // TODO(lucab): implement all remaining policies.
+            _ => 0.0,
+        };
+        let rounded = format!("{:.6}", throttling);
+        Some(rounded)
+    }
 }
+
+impl Default for RolloutPolicy {
+    fn default() -> Self {
+        let policy = PolicyDefault {};
+        RolloutPolicy::Default(policy)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PolicyDefault {}
 
 #[derive(Debug, Deserialize)]
 pub struct PolicyLinear {
     pub start: String,
     pub end: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PolicyManual {
+    pub throttling: f32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -204,9 +230,7 @@ impl Scraper {
           }
         ],
         "policy": {
-          "kind": "linear",
-          "start": "t_start",
-          "end": "t_end"
+          "kind": "default"
         }
       }
     ]
