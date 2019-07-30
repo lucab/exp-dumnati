@@ -12,8 +12,7 @@ static RELEASES_JSON: &str =
     "https://builds.coreos.fedoraproject.org/prod/streams/${stream}/releases.json";
 
 /// Templated URL for stream metadata.
-static STREAM_JSON: &str =
-    "https://builds.coreos.fedoraproject.org/prod/streams/${stream}/stream.json";
+static STREAM_JSON: &str = "https://builds.coreos.fedoraproject.org/streams/${stream}.json";
 
 lazy_static::lazy_static! {
     static ref GRAPH_FINAL_RELEASES: IntGauge = register_int_gauge!(opts!(
