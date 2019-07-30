@@ -29,7 +29,8 @@ impl Graph {
     pub fn from_metadata(releases: Vec<Release>, updates: Updates) -> Fallible<Self> {
         let nodes = releases
             .into_iter()
-            .scan(String::new(), |parent, entry| {
+            .enumerate()
+            .map(|(age_index, entry)| {
                 // XXX(lucab): may panic, this should match on arch instead.
                 let payload = entry.commits[0].checksum.clone();
                 let mut current = CincinnatiPayload {
@@ -37,16 +38,10 @@ impl Graph {
                     payload,
                     metadata: hashmap! {
                         "org.fedoraproject.coreos.scheme".to_string() => "checksum".to_string(),
+                        "org.fedoraproject.coreos.metadata.releases.age_index".to_string() => age_index.to_string(),
                     },
                 };
-                // Augment with child->parent metadata.
-                if !parent.is_empty() {
-                    current.metadata.insert(
-                        "org.fedoraproject.coreos.metadata.releases.parent_version".to_string(),
-                        parent.to_string(),
-                    );
-                }
-                // Augment with deadends metadata.
+                // Augment with dead-ends metadata.
                 if let Some(reason) = deadend_reason(&updates, &current) {
                     current.metadata.insert(
                         "org.fedoraproject.coreos.metadata.stream.deadend".to_string(),
@@ -57,8 +52,7 @@ impl Graph {
                         reason,
                     );
                 }
-                *parent = current.version.clone();
-                Some(current)
+                current
             })
             .collect();
 
