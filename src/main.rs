@@ -84,7 +84,29 @@ pub(crate) struct AppState {
 pub(crate) fn serve_graph(
     req: HttpRequest<AppState>,
 ) -> Box<Future<Item = HttpResponse, Error = Error>> {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
     record_metrics(&req);
+
+    let uuid = req
+        .query()
+        .get("node_uuid")
+        .map(String::from)
+        .unwrap_or_default();
+    let _wariness = {
+        // Left limit not included in range.
+        const COMPUTED_MIN: f64 = 0.0 + 0.000001;
+        const COMPUTED_MAX: f64 = 1.0;
+        let mut hasher = DefaultHasher::new();
+        uuid.hash(&mut hasher);
+        let digest = hasher.finish();
+        // Scale down.
+        let scaled = (digest as f64) / (std::u64::MAX as f64);
+        // Clamp within limits.
+        scaled.max(COMPUTED_MIN).min(COMPUTED_MAX)
+    };
+    // XXX(lucab): this is over the maximum on purpose.
+    let wariness = 1.1;
 
     let cached_graph = req
         .state()
@@ -93,6 +115,8 @@ pub(crate) fn serve_graph(
         .flatten();
 
     let resp = cached_graph
+        .map(move |graph| graph.throttle_rollouts(wariness))
+        .map(|graph| graph.filter_deadends())
         .and_then(|graph| {
             serde_json::to_string_pretty(&graph).map_err(|e| failure::format_err!("{}", e))
         })

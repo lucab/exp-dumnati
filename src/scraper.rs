@@ -77,60 +77,9 @@ pub struct UpdateDeadend {
 #[derive(Debug, Deserialize)]
 pub struct UpdateRollout {
     pub version: String,
-    pub pauses: Vec<RolloutPause>,
-    #[serde(default)]
-    pub policy: RolloutPolicy,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct RolloutPause {
-    pub start: String,
-    pub end: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind")]
-pub enum RolloutPolicy {
-    #[serde(rename = "default")]
-    Default(PolicyDefault),
-    #[serde(rename = "manual")]
-    Manual(PolicyManual),
-    #[serde(rename = "linear")]
-    Linear(PolicyLinear),
-}
-
-impl RolloutPolicy {
-    pub fn compute_throttling(&self) -> Option<String> {
-        let throttling = match &self {
-            RolloutPolicy::Default(_) => 1.0,
-            RolloutPolicy::Manual(pm) => pm.throttling,
-            // TODO(lucab): implement all remaining policies.
-            _ => 0.0,
-        };
-        let rounded = format!("{:.6}", throttling);
-        Some(rounded)
-    }
-}
-
-impl Default for RolloutPolicy {
-    fn default() -> Self {
-        let policy = PolicyDefault {};
-        RolloutPolicy::Default(policy)
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PolicyDefault {}
-
-#[derive(Debug, Deserialize)]
-pub struct PolicyLinear {
-    pub start: String,
-    pub end: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PolicyManual {
-    pub throttling: f32,
+    pub start_epoch: String,
+    pub start_value: String,
+    pub duration_minutes: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -210,8 +159,8 @@ impl Scraper {
   "updates": {
     "barriers": [
       {
-        "version": "FOO",
-        "reason": "BAR"
+        "version": "SOME_FAKE_VERSION",
+        "reason": "https://fake-reason.example.com"
       }
     ],
     "deadends": [
@@ -222,16 +171,10 @@ impl Scraper {
     ],
     "rollouts": [
       {
-        "version": "30.20190725.0",
-        "pauses": [
-          {
-            "start": "t_start",
-            "end": "t_end"
-          }
-        ],
-        "policy": {
-          "kind": "default"
-        }
+        "version": "30.20190801.0",
+        "start_epoch": "1564755284",
+        "start_value": "0.0",
+        "duration_minutes": "3600"
       }
     ]
   }
