@@ -120,10 +120,10 @@ impl Graph {
                 None => 0i64,
             };
 
-            // Start epoch defaults to 1.0.
+            // Start value defaults to 0.0.
             let start_value = match release.metadata.get(START_VALUE) {
                 Some(val) => val.parse::<f64>().unwrap_or(0f64),
-                None => 1f64,
+                None => 0f64,
             };
 
             // Duration has no default (i.e. no progress).
