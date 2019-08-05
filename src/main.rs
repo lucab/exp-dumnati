@@ -17,6 +17,7 @@ extern crate prometheus;
 mod graph;
 mod metadata;
 mod metrics;
+mod policy;
 mod scraper;
 
 use actix::prelude::*;
@@ -115,7 +116,7 @@ pub(crate) fn serve_graph(
 
     let resp = cached_graph
         .map(move |graph| graph.throttle_rollouts(wariness))
-        .map(|graph| graph.filter_deadends())
+        .map(|graph| policy::filter_deadends(graph))
         .and_then(|graph| {
             serde_json::to_string_pretty(&graph).map_err(|e| failure::format_err!("{}", e))
         })

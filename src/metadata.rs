@@ -9,6 +9,16 @@ pub static RELEASES_JSON: &str =
 /// Templated URL for stream metadata.
 pub static STREAM_JSON: &str = "https://builds.coreos.fedoraproject.org/updates/${stream}.json";
 
+pub static SCHEME: &str = "org.fedoraproject.coreos.scheme";
+
+pub static AGE_INDEX: &str = "org.fedoraproject.coreos.releases.age_index";
+
+pub static DEADEND: &str = "org.fedoraproject.coreos.updates.deadend";
+pub static DEADEND_REASON: &str = "org.fedoraproject.coreos.updates.deadend_reason";
+pub static DURATION: &str = "org.fedoraproject.coreos.updates.duration_minutes";
+pub static START_EPOCH: &str = "org.fedoraproject.coreos.updates.start_epoch";
+pub static START_VALUE: &str = "org.fedoraproject.coreos.updates.start_value";
+
 /// Fedora CoreOS release index.
 #[derive(Debug, Deserialize)]
 pub struct ReleasesJSON {

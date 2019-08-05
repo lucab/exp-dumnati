@@ -1,17 +1,7 @@
-use crate::metadata::{Release, Updates};
+use crate::metadata;
 use failure::Fallible;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-static SCHEME: &str = "org.fedoraproject.coreos.scheme";
-
-static AGE_INDEX: &str = "org.fedoraproject.coreos.releases.age_index";
-
-static DEADEND: &str = "org.fedoraproject.coreos.updates.deadend";
-static DEADEND_REASON: &str = "org.fedoraproject.coreos.updates.deadend_reason";
-static DURATION: &str = "org.fedoraproject.coreos.updates.duration_minutes";
-static START_EPOCH: &str = "org.fedoraproject.coreos.updates.start_epoch";
-static START_VALUE: &str = "org.fedoraproject.coreos.updates.start_value";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct CincinnatiPayload {
@@ -36,7 +26,10 @@ impl Default for Graph {
 }
 
 impl Graph {
-    pub fn from_metadata(releases: Vec<Release>, updates: Updates) -> Fallible<Self> {
+    pub fn from_metadata(
+        releases: Vec<metadata::Release>,
+        updates: metadata::Updates,
+    ) -> Fallible<Self> {
         let nodes = releases
             .into_iter()
             .enumerate()
@@ -47,8 +40,8 @@ impl Graph {
                     version: entry.version,
                     payload,
                     metadata: hashmap! {
-                        SCHEME.to_string() => "checksum".to_string(),
-                        AGE_INDEX.to_string() => age_index.to_string(),
+                        metadata::SCHEME.to_string() => "checksum".to_string(),
+                        metadata::AGE_INDEX.to_string() => age_index.to_string(),
                     },
                 };
 
@@ -56,8 +49,10 @@ impl Graph {
                 if let Some(reason) = deadend_reason(&updates, &current) {
                     current
                         .metadata
-                        .insert(DEADEND.to_string(), true.to_string());
-                    current.metadata.insert(DEADEND_REASON.to_string(), reason);
+                        .insert(metadata::DEADEND.to_string(), true.to_string());
+                    current
+                        .metadata
+                        .insert(metadata::DEADEND_REASON.to_string(), reason);
                 }
 
                 // Augment with rollouts metadata.
@@ -74,32 +69,6 @@ impl Graph {
         Ok(graph)
     }
 
-    pub fn filter_deadends(self) -> Self {
-        use std::collections::HashSet;
-
-        let mut graph = self;
-        let mut deadends = HashSet::new();
-        for (index, release) in graph.nodes.iter().enumerate() {
-            if release.metadata.get(DEADEND) == Some(&"true".into()) {
-                deadends.insert(index);
-            }
-        }
-
-        graph.edges = graph
-            .edges
-            .into_iter()
-            .filter_map(|(from, to)| {
-                let src = from as usize;
-                if deadends.contains(&src) {
-                    None
-                } else {
-                    Some((from, to))
-                }
-            })
-            .collect();
-        graph
-    }
-
     pub fn throttle_rollouts(self, client_wariness: f64) -> Self {
         use std::collections::HashSet;
 
@@ -108,27 +77,27 @@ impl Graph {
         let mut hidden = HashSet::new();
         for (index, release) in graph.nodes.iter().enumerate() {
             // Skip if this release is not being rolled out.
-            if release.metadata.get(START_EPOCH).is_none()
-                && release.metadata.get(START_VALUE).is_none()
+            if release.metadata.get(metadata::START_EPOCH).is_none()
+                && release.metadata.get(metadata::START_VALUE).is_none()
             {
                 continue;
             };
 
             // Start epoch defaults to 0.
-            let start_epoch = match release.metadata.get(START_EPOCH) {
+            let start_epoch = match release.metadata.get(metadata::START_EPOCH) {
                 Some(epoch) => epoch.parse::<i64>().unwrap_or(0),
                 None => 0i64,
             };
 
             // Start value defaults to 0.0.
-            let start_value = match release.metadata.get(START_VALUE) {
+            let start_value = match release.metadata.get(metadata::START_VALUE) {
                 Some(val) => val.parse::<f64>().unwrap_or(0f64),
                 None => 0f64,
             };
 
             // Duration has no default (i.e. no progress).
             let mut minutes: Option<u64> = None;
-            if let Some(mins) = release.metadata.get(DURATION) {
+            if let Some(mins) = release.metadata.get(metadata::DURATION) {
                 if let Ok(m) = mins.parse::<u64>() {
                     minutes = Some(m.max(1));
                 }
@@ -175,7 +144,7 @@ impl Graph {
     }
 }
 
-fn deadend_reason(updates: &Updates, release: &CincinnatiPayload) -> Option<String> {
+fn deadend_reason(updates: &metadata::Updates, release: &CincinnatiPayload) -> Option<String> {
     updates.deadends.iter().find_map(|dead| {
         if dead.version != release.version {
             return None;
@@ -189,7 +158,7 @@ fn deadend_reason(updates: &Updates, release: &CincinnatiPayload) -> Option<Stri
     })
 }
 
-fn inject_throttling_params(updates: &Updates, release: &mut CincinnatiPayload) {
+fn inject_throttling_params(updates: &metadata::Updates, release: &mut CincinnatiPayload) {
     for entry in &updates.rollouts {
         if entry.version != release.version {
             continue;
@@ -197,14 +166,14 @@ fn inject_throttling_params(updates: &Updates, release: &mut CincinnatiPayload) 
 
         release
             .metadata
-            .insert(START_EPOCH.to_string(), entry.start_epoch.clone());
+            .insert(metadata::START_EPOCH.to_string(), entry.start_epoch.clone());
         release
             .metadata
-            .insert(START_VALUE.to_string(), entry.start_value.clone());
+            .insert(metadata::START_VALUE.to_string(), entry.start_value.clone());
         if let Some(minutes) = &entry.duration_minutes {
             release
                 .metadata
-                .insert(DURATION.to_string(), minutes.clone());
+                .insert(metadata::DURATION.to_string(), minutes.clone());
         }
     }
 }
