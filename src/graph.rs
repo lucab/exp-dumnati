@@ -3,6 +3,14 @@ use failure::Fallible;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+static SCHEME: &str = "org.fedoraproject.coreos.scheme";
+static AGE_INDEX: &str = "org.fedoraproject.coreos.releases.age_index";
+static DEADEND: &str = "org.fedoraproject.coreos.updates.deadend";
+static DEADEND_REASON: &str = "org.fedoraproject.coreos.updates.deadend_reason";
+static START_EPOCH: &str = "org.fedoraproject.coreos.updates.start_epoch";
+static START_VALUE: &str = "org.fedoraproject.coreos.updates.start_value";
+static DURATION: &str = "org.fedoraproject.coreos.updates.duration_minutes";
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct CincinnatiPayload {
     pub(crate) version: String,
@@ -37,21 +45,17 @@ impl Graph {
                     version: entry.version,
                     payload,
                     metadata: hashmap! {
-                        "org.fedoraproject.coreos.scheme".to_string() => "checksum".to_string(),
-                        "org.fedoraproject.coreos.metadata.releases.age_index".to_string() => age_index.to_string(),
+                        SCHEME.to_string() => "checksum".to_string(),
+                        AGE_INDEX.to_string() => age_index.to_string(),
                     },
                 };
 
                 // Augment with dead-ends metadata.
                 if let Some(reason) = deadend_reason(&updates, &current) {
-                    current.metadata.insert(
-                        "org.fedoraproject.coreos.metadata.updates.deadend".to_string(),
-                        true.to_string(),
-                    );
-                    current.metadata.insert(
-                        "org.fedoraproject.coreos.metadata.updates.deadend.reason".to_string(),
-                        reason,
-                    );
+                    current
+                        .metadata
+                        .insert(DEADEND.to_string(), true.to_string());
+                    current.metadata.insert(DEADEND_REASON.to_string(), reason);
                 }
 
                 // Augment with rollouts metadata.
@@ -70,12 +74,11 @@ impl Graph {
 
     pub fn filter_deadends(self) -> Self {
         use std::collections::HashSet;
-        static KEY: &str = "org.fedoraproject.coreos.metadata.updates.deadend";
 
         let mut graph = self;
         let mut deadends = HashSet::new();
         for (index, release) in graph.nodes.iter().enumerate() {
-            if release.metadata.get(KEY) == Some(&"true".into()) {
+            if release.metadata.get(DEADEND) == Some(&"true".into()) {
                 deadends.insert(index);
             }
         }
@@ -97,39 +100,42 @@ impl Graph {
 
     pub fn throttle_rollouts(self, client_wariness: f64) -> Self {
         use std::collections::HashSet;
-        static START_EPOCH: &str = "org.fedoraproject.coreos.metadata.updates.start_epoch";
-        static START_VALUE: &str = "org.fedoraproject.coreos.metadata.updates.start_value";
-        static DURATION: &str = "org.fedoraproject.coreos.metadata.updates.duration_minutes";
 
         let now = chrono::Utc::now().timestamp();
         let mut graph = self;
         let mut hidden = HashSet::new();
         for (index, release) in graph.nodes.iter().enumerate() {
-            let start_epoch: i64;
-            if let Some(epoch) = release.metadata.get(START_EPOCH) {
-                start_epoch = epoch.parse::<i64>().unwrap_or(0);
-            } else {
+            // Skip if this release is not being rolled out.
+            if release.metadata.get(START_EPOCH).is_none()
+                && release.metadata.get(START_VALUE).is_none()
+            {
                 continue;
-            }
+            };
 
-            let start_value: f64;
-            if let Some(val) = release.metadata.get(START_VALUE) {
-                start_value = val.parse::<f64>().unwrap_or(0f64);
-            } else {
-                continue;
-            }
+            // Start epoch defaults to 0.
+            let start_epoch = match release.metadata.get(START_EPOCH) {
+                Some(epoch) => epoch.parse::<i64>().unwrap_or(0),
+                None => 0i64,
+            };
 
+            // Start epoch defaults to 1.0.
+            let start_value = match release.metadata.get(START_VALUE) {
+                Some(val) => val.parse::<f64>().unwrap_or(0f64),
+                None => 1f64,
+            };
+
+            // Duration has no default (i.e. no progress).
             let mut minutes: Option<u64> = None;
             if let Some(mins) = release.metadata.get(DURATION) {
                 if let Ok(m) = mins.parse::<u64>() {
-                    minutes = Some(m);
+                    minutes = Some(m.max(1));
                 }
             }
 
             let throttling: f64;
             if let Some(mins) = minutes {
-                let end = start_epoch + (mins * 60) as i64;
-                let rate = (1.0 - start_value) / (end - start_epoch) as f64;
+                let end = start_epoch + (mins.saturating_mul(60)) as i64;
+                let rate = (1.0 - start_value) / (end.saturating_sub(start_epoch)) as f64;
                 if now < start_epoch {
                     throttling = 0.0;
                 } else if now > end {
@@ -138,6 +144,7 @@ impl Graph {
                     throttling = start_value + rate * (now - start_epoch) as f64;
                 }
             } else {
+                // Without duration, rollout does not progress past initial value.
                 if now < start_epoch {
                     throttling = 0.0;
                 } else {
@@ -187,16 +194,16 @@ fn inject_throttling_params(updates: &Updates, release: &mut CincinnatiPayload) 
         }
 
         release.metadata.insert(
-            "org.fedoraproject.coreos.metadata.updates.start_epoch".to_string(),
+            "org.fedoraproject.coreos.updates.start_epoch".to_string(),
             entry.start_epoch.clone(),
         );
         release.metadata.insert(
-            "org.fedoraproject.coreos.metadata.updates.start_value".to_string(),
+            "org.fedoraproject.coreos.updates.start_value".to_string(),
             entry.start_value.clone(),
         );
         if let Some(minutes) = &entry.duration_minutes {
             release.metadata.insert(
-                "org.fedoraproject.coreos.metadata.updates.duration_minutes".to_string(),
+                "org.fedoraproject.coreos.updates.duration_minutes".to_string(),
                 minutes.clone(),
             );
         }

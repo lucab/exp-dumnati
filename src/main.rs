@@ -93,7 +93,7 @@ pub(crate) fn serve_graph(
         .get("node_uuid")
         .map(String::from)
         .unwrap_or_default();
-    let _wariness = {
+    let wariness = {
         // Left limit not included in range.
         const COMPUTED_MIN: f64 = 0.0 + 0.000001;
         const COMPUTED_MAX: f64 = 1.0;
@@ -105,8 +105,6 @@ pub(crate) fn serve_graph(
         // Clamp within limits.
         scaled.max(COMPUTED_MIN).min(COMPUTED_MAX)
     };
-    // XXX(lucab): this is over the maximum on purpose.
-    let wariness = 1.1;
 
     let cached_graph = req
         .state()

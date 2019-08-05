@@ -12,7 +12,7 @@ static RELEASES_JSON: &str =
     "https://builds.coreos.fedoraproject.org/prod/streams/${stream}/releases.json";
 
 /// Templated URL for stream metadata.
-static STREAM_JSON: &str = "https://builds.coreos.fedoraproject.org/streams/${stream}.json";
+static STREAM_JSON: &str = "https://builds.coreos.fedoraproject.org/updates/${stream}.json";
 
 lazy_static::lazy_static! {
     static ref GRAPH_FINAL_RELEASES: IntGauge = register_int_gauge!(opts!(
@@ -142,7 +142,7 @@ impl Scraper {
     }
 
     /// Fetch stream metadata.
-    fn _fetch_stream_updates(&self) -> impl Future<Item = Updates, Error = Error> {
+    fn fetch_stream_updates(&self) -> impl Future<Item = Updates, Error = Error> {
         let url = self.stream_metadata_url.clone();
         let req = self.new_request(Method::GET, url);
         future::result(req)
@@ -152,42 +152,8 @@ impl Scraper {
             .map(|json| json.updates)
     }
 
-    /// Mock for `fetch_stream_updates`
-    fn mock_stream_updates(&self) -> impl Future<Item = Updates, Error = Error> {
-        let stream_json = r#"
-{
-  "updates": {
-    "barriers": [
-      {
-        "version": "SOME_FAKE_VERSION",
-        "reason": "https://fake-reason.example.com"
-      }
-    ],
-    "deadends": [
-      {
-        "version": "30.20190716.1",
-        "reason": "https://github.com/coreos/fedora-coreos-tracker/issues/215"
-      }
-    ],
-    "rollouts": [
-      {
-        "version": "30.20190801.0",
-        "start_epoch": "1564755284",
-        "start_value": "0.0",
-        "duration_minutes": "3600"
-      }
-    ]
-  }
-}
-"#;
-        let stream: Fallible<StreamMetadata> =
-            serde_json::from_str(&stream_json).map_err(Error::from);
-
-        futures::future::result(stream).map(|json| json.updates)
-    }
-
     fn assemble_graph(&self) -> impl Future<Item = graph::Graph, Error = Error> {
-        let stream_updates = self.mock_stream_updates();
+        let stream_updates = self.fetch_stream_updates();
         let subscraper = self.clone();
 
         // XXX(lucab): let's try to avoid fetching each release metadata, if possible.
