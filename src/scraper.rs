@@ -15,9 +15,13 @@ static RELEASES_JSON: &str =
 static STREAM_JSON: &str = "https://builds.coreos.fedoraproject.org/updates/${stream}.json";
 
 lazy_static::lazy_static! {
+    static ref GRAPH_FINAL_EDGES: IntGauge = register_int_gauge!(opts!(
+        "dumnati_scraper_graph_final_edges",
+        "Number of edges in the cached graph, after processing"
+    )).unwrap();
     static ref GRAPH_FINAL_RELEASES: IntGauge = register_int_gauge!(opts!(
         "dumnati_scraper_graph_final_releases",
-        "Number of releases in the final graph, after processing"
+        "Number of releases in the cached graph, after processing"
     )).unwrap();
     static ref LAST_REFRESH: IntGauge = register_int_gauge!(opts!(
         "dumnati_scraper_graph_last_refresh_timestamp",
@@ -181,7 +185,8 @@ impl Handler<RefreshTick> for Scraper {
                 actor.graph = graph;
                 let refresh_timestamp = chrono::Utc::now();
                 LAST_REFRESH.set(refresh_timestamp.timestamp());
-                GRAPH_FINAL_RELEASES.set(actor.graph.nodes.len() as i64)
+                GRAPH_FINAL_EDGES.set(actor.graph.edges.len() as i64);
+                GRAPH_FINAL_RELEASES.set(actor.graph.nodes.len() as i64);
             })
             .then(|_r, _actor, ctx| {
                 Self::tick_later(ctx, std::time::Duration::from_secs(30));
