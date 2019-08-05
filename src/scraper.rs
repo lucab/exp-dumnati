@@ -1,18 +1,10 @@
-use crate::graph;
+use crate::{graph, metadata};
 use actix::prelude::*;
 use failure::{Error, Fallible};
 use futures::future;
 use futures::prelude::*;
 use prometheus::{IntCounter, IntGauge};
 use reqwest::Method;
-use serde_derive::Deserialize;
-
-/// Templated URL for release index.
-static RELEASES_JSON: &str =
-    "https://builds.coreos.fedoraproject.org/prod/streams/${stream}/releases.json";
-
-/// Templated URL for stream metadata.
-static STREAM_JSON: &str = "https://builds.coreos.fedoraproject.org/updates/${stream}.json";
 
 lazy_static::lazy_static! {
     static ref GRAPH_FINAL_EDGES: IntGauge = register_int_gauge!(opts!(
@@ -34,58 +26,6 @@ lazy_static::lazy_static! {
     .unwrap();
 }
 
-/// Fedora CoreOS release index
-#[derive(Debug, Deserialize)]
-pub struct ReleaseIndex {
-    pub releases: Vec<Release>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Release {
-    pub commits: Vec<ReleaseCommit>,
-    pub version: String,
-    pub metadata: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ReleaseCommit {
-    pub architecture: String,
-    pub checksum: String,
-}
-
-/// Fedora CoreOS release index
-#[derive(Debug, Deserialize)]
-pub struct UpdatesMetadata {
-    pub updates: Updates,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Updates {
-    pub barriers: Vec<UpdateBarrier>,
-    pub deadends: Vec<UpdateDeadend>,
-    pub rollouts: Vec<UpdateRollout>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UpdateBarrier {
-    pub version: String,
-    pub reason: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UpdateDeadend {
-    pub version: String,
-    pub reason: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UpdateRollout {
-    pub version: String,
-    pub start_epoch: String,
-    pub start_value: String,
-    pub duration_minutes: Option<String>,
-}
-
 /// Release scraper.
 #[derive(Clone, Debug)]
 pub struct Scraper {
@@ -101,8 +41,8 @@ impl Scraper {
         S: Into<String>,
     {
         let vars = hashmap! { "stream".to_string() => stream.into() };
-        let releases_json = envsubst::substitute(RELEASES_JSON, &vars)?;
-        let stream_json = envsubst::substitute(STREAM_JSON, &vars)?;
+        let releases_json = envsubst::substitute(metadata::RELEASES_JSON, &vars)?;
+        let stream_json = envsubst::substitute(metadata::STREAM_JSON, &vars)?;
         let scraper = Self {
             graph: graph::Graph::default(),
             hclient: reqwest::r#async::ClientBuilder::new().build()?,
@@ -123,24 +63,24 @@ impl Scraper {
     }
 
     /// Fetch releases from release-index.
-    fn fetch_releases(&self) -> impl Future<Item = Vec<Release>, Error = Error> {
+    fn fetch_releases(&self) -> impl Future<Item = Vec<metadata::Release>, Error = Error> {
         let url = self.release_index_url.clone();
         let req = self.new_request(Method::GET, url);
         future::result(req)
             .and_then(|req| req.send().from_err())
             .and_then(|resp| resp.error_for_status().map_err(Error::from))
-            .and_then(|mut resp| resp.json::<ReleaseIndex>().from_err())
+            .and_then(|mut resp| resp.json::<metadata::ReleasesJSON>().from_err())
             .map(|json| json.releases)
     }
 
     /// Fetch updates metadata.
-    fn fetch_updates(&self) -> impl Future<Item = Updates, Error = Error> {
+    fn fetch_updates(&self) -> impl Future<Item = metadata::Updates, Error = Error> {
         let url = self.stream_metadata_url.clone();
         let req = self.new_request(Method::GET, url);
         future::result(req)
             .and_then(|req| req.send().from_err())
             .and_then(|resp| resp.error_for_status().map_err(Error::from))
-            .and_then(|mut resp| resp.json::<UpdatesMetadata>().from_err())
+            .and_then(|mut resp| resp.json::<metadata::UpdatesJSON>().from_err())
             .map(|json| json.updates)
     }
 

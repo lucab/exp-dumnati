@@ -15,6 +15,7 @@ extern crate structopt;
 extern crate prometheus;
 
 mod graph;
+mod metadata;
 mod metrics;
 mod scraper;
 

@@ -1,4 +1,4 @@
-use crate::scraper::{Release, Updates};
+use crate::metadata::{Release, Updates};
 use failure::Fallible;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -195,19 +195,16 @@ fn inject_throttling_params(updates: &Updates, release: &mut CincinnatiPayload) 
             continue;
         }
 
-        release.metadata.insert(
-            START_EPOCH.to_string(),
-            entry.start_epoch.clone(),
-        );
-        release.metadata.insert(
-            START_VALUE.to_string(),
-            entry.start_value.clone(),
-        );
+        release
+            .metadata
+            .insert(START_EPOCH.to_string(), entry.start_epoch.clone());
+        release
+            .metadata
+            .insert(START_VALUE.to_string(), entry.start_value.clone());
         if let Some(minutes) = &entry.duration_minutes {
-            release.metadata.insert(
-                DURATION.to_string(),
-                minutes.clone(),
-            );
+            release
+                .metadata
+                .insert(DURATION.to_string(), minutes.clone());
         }
     }
 }
