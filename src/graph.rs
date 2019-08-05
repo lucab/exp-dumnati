@@ -4,12 +4,14 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 static SCHEME: &str = "org.fedoraproject.coreos.scheme";
+
 static AGE_INDEX: &str = "org.fedoraproject.coreos.releases.age_index";
+
 static DEADEND: &str = "org.fedoraproject.coreos.updates.deadend";
 static DEADEND_REASON: &str = "org.fedoraproject.coreos.updates.deadend_reason";
+static DURATION: &str = "org.fedoraproject.coreos.updates.duration_minutes";
 static START_EPOCH: &str = "org.fedoraproject.coreos.updates.start_epoch";
 static START_VALUE: &str = "org.fedoraproject.coreos.updates.start_value";
-static DURATION: &str = "org.fedoraproject.coreos.updates.duration_minutes";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct CincinnatiPayload {
@@ -194,16 +196,16 @@ fn inject_throttling_params(updates: &Updates, release: &mut CincinnatiPayload) 
         }
 
         release.metadata.insert(
-            "org.fedoraproject.coreos.updates.start_epoch".to_string(),
+            START_EPOCH.to_string(),
             entry.start_epoch.clone(),
         );
         release.metadata.insert(
-            "org.fedoraproject.coreos.updates.start_value".to_string(),
+            START_VALUE.to_string(),
             entry.start_value.clone(),
         );
         if let Some(minutes) = &entry.duration_minutes {
             release.metadata.insert(
-                "org.fedoraproject.coreos.updates.duration_minutes".to_string(),
+                DURATION.to_string(),
                 minutes.clone(),
             );
         }
