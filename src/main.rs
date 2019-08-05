@@ -25,7 +25,8 @@ use actix_web::{http::Method, middleware::Logger, server, App};
 use actix_web::{HttpRequest, HttpResponse};
 use failure::{Error, Fallible};
 use futures::prelude::*;
-use prometheus::IntCounter;
+use prometheus::{Histogram, IntCounter};
+use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use structopt::StructOpt;
@@ -40,6 +41,12 @@ lazy_static::lazy_static! {
         "dumnati_v1_graph_unique_uuids_total",
         "Total number of unique node UUIDs (per-instance Bloom filter)."
     ))
+    .unwrap();
+    static ref ROLLOUT_WARINESS: Histogram = register_histogram!(
+        "dumnati_v1_graph_rollout_wariness",
+        "Per-request rollout wariness.",
+        prometheus::linear_buckets(0.0, 0.1, 11).unwrap()
+    )
     .unwrap();
 }
 
@@ -86,27 +93,10 @@ pub(crate) struct AppState {
 pub(crate) fn serve_graph(
     req: HttpRequest<AppState>,
 ) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
     record_metrics(&req);
 
-    let uuid = req
-        .query()
-        .get("node_uuid")
-        .map(String::from)
-        .unwrap_or_default();
-    let wariness = {
-        // Left limit not included in range.
-        const COMPUTED_MIN: f64 = 0.0 + 0.000001;
-        const COMPUTED_MAX: f64 = 1.0;
-        let mut hasher = DefaultHasher::new();
-        uuid.hash(&mut hasher);
-        let digest = hasher.finish();
-        // Scale down.
-        let scaled = (digest as f64) / (std::u64::MAX as f64);
-        // Clamp within limits.
-        scaled.max(COMPUTED_MIN).min(COMPUTED_MAX)
-    };
+    let wariness = compute_wariness(&req.query());
+    ROLLOUT_WARINESS.observe(wariness);
 
     let cached_graph = req
         .state()
@@ -127,6 +117,40 @@ pub(crate) fn serve_graph(
         });
 
     Box::new(resp)
+}
+
+fn compute_wariness(params: &HashMap<String, String>) -> f64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    if let Ok(input) = params
+        .get("rollout_wariness")
+        .map(String::from)
+        .unwrap_or_default()
+        .parse::<f64>()
+    {
+        let wariness = input.max(0.0).min(1.0);
+        return wariness;
+    }
+
+    let uuid = params
+        .get("node_uuid")
+        .map(String::from)
+        .unwrap_or_default();
+    let wariness = {
+        // Left limit not included in range.
+        const COMPUTED_MIN: f64 = 0.0 + 0.000001;
+        const COMPUTED_MAX: f64 = 1.0;
+        let mut hasher = DefaultHasher::new();
+        uuid.hash(&mut hasher);
+        let digest = hasher.finish();
+        // Scale down.
+        let scaled = (digest as f64) / (std::u64::MAX as f64);
+        // Clamp within limits.
+        scaled.max(COMPUTED_MIN).min(COMPUTED_MAX)
+    };
+
+    wariness
 }
 
 pub(crate) fn record_metrics(req: &HttpRequest<AppState>) {
