@@ -51,7 +51,7 @@ pub struct ReleaseCommit {
 
 /// Fedora CoreOS release index
 #[derive(Debug, Deserialize)]
-pub struct StreamMetadata {
+pub struct UpdatesMetadata {
     pub updates: Updates,
 }
 
@@ -81,9 +81,6 @@ pub struct UpdateRollout {
     pub start_value: String,
     pub duration_minutes: Option<String>,
 }
-
-#[derive(Debug, Deserialize)]
-pub struct ReleaseMeta {}
 
 /// Release scraper.
 #[derive(Clone, Debug)]
@@ -132,48 +129,23 @@ impl Scraper {
             .map(|json| json.releases)
     }
 
-    /// Fetch releases from release-index.
-    fn fetch_meta(self, url: reqwest::Url) -> impl Future<Item = ReleaseMeta, Error = Error> {
-        let req = self.new_request(Method::GET, url);
-        future::result(req)
-            .and_then(|req| req.send().from_err())
-            .and_then(|resp| resp.error_for_status().map_err(Error::from))
-            .and_then(|mut resp| resp.json::<ReleaseMeta>().from_err())
-    }
-
-    /// Fetch stream metadata.
-    fn fetch_stream_updates(&self) -> impl Future<Item = Updates, Error = Error> {
+    /// Fetch updates metadata.
+    fn fetch_updates(&self) -> impl Future<Item = Updates, Error = Error> {
         let url = self.stream_metadata_url.clone();
         let req = self.new_request(Method::GET, url);
         future::result(req)
             .and_then(|req| req.send().from_err())
             .and_then(|resp| resp.error_for_status().map_err(Error::from))
-            .and_then(|mut resp| resp.json::<StreamMetadata>().from_err())
+            .and_then(|mut resp| resp.json::<UpdatesMetadata>().from_err())
             .map(|json| json.updates)
     }
 
+    /// Combine release-index and updates metadata.
     fn assemble_graph(&self) -> impl Future<Item = graph::Graph, Error = Error> {
-        let stream_updates = self.fetch_stream_updates();
-        let subscraper = self.clone();
+        let stream_updates = self.fetch_updates();
+        let stream_releases = self.fetch_releases();
 
-        // XXX(lucab): let's try to avoid fetching each release metadata, if possible.
-        let _release_metas = self
-            .fetch_releases()
-            .map(|release| {
-                futures::stream::iter_ok(release.into_iter().map(|r| r.metadata).enumerate())
-            })
-            .into_stream()
-            .flatten()
-            .and_then(move |(_pos, url)| {
-                subscraper
-                    .clone()
-                    .fetch_meta(reqwest::Url::parse(&url).unwrap())
-            })
-            .collect();
-
-        let releases = self.fetch_releases();
-
-        let updates = releases
+        let updates = stream_releases
             .join(stream_updates)
             .and_then(|(graph, updates)| graph::Graph::from_metadata(graph, updates));
         updates
