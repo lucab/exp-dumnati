@@ -115,7 +115,7 @@ pub(crate) fn serve_graph(
         .flatten();
 
     let resp = cached_graph
-        .map(move |graph| graph.throttle_rollouts(wariness))
+        .map(move |graph| policy::throttle_rollouts(graph, wariness))
         .map(|graph| policy::filter_deadends(graph))
         .and_then(|graph| {
             serde_json::to_string_pretty(&graph).map_err(|e| failure::format_err!("{}", e))
