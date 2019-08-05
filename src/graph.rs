@@ -46,17 +46,10 @@ impl Graph {
                 };
 
                 // Augment with dead-ends metadata.
-                if let Some(reason) = deadend_reason(&updates, &current) {
-                    current
-                        .metadata
-                        .insert(metadata::DEADEND.to_string(), true.to_string());
-                    current
-                        .metadata
-                        .insert(metadata::DEADEND_REASON.to_string(), reason);
-                }
+                Self::inject_deadend_reason(&updates, &mut current);
 
                 // Augment with rollouts metadata.
-                inject_throttling_params(&updates, &mut current);
+                Self::inject_throttling_params(&updates, &mut current);
 
                 current
             })
@@ -68,38 +61,45 @@ impl Graph {
         let graph = Graph { nodes, edges };
         Ok(graph)
     }
-}
 
-fn deadend_reason(updates: &metadata::Updates, release: &CincinnatiPayload) -> Option<String> {
-    updates.deadends.iter().find_map(|dead| {
-        if dead.version != release.version {
-            return None;
-        }
+    fn inject_deadend_reason(updates: &metadata::Updates, release: &mut CincinnatiPayload) {
+        for entry in &updates.deadends {
+            if entry.version != release.version {
+                continue;
+            }
 
-        if dead.reason.is_empty() {
-            return Some(String::from("generic"));
-        }
+            let reason = if entry.reason.is_empty() {
+                "generic"
+            } else {
+                &entry.reason
+            };
 
-        Some(dead.reason.clone())
-    })
-}
-
-fn inject_throttling_params(updates: &metadata::Updates, release: &mut CincinnatiPayload) {
-    for entry in &updates.rollouts {
-        if entry.version != release.version {
-            continue;
-        }
-
-        release
-            .metadata
-            .insert(metadata::START_EPOCH.to_string(), entry.start_epoch.clone());
-        release
-            .metadata
-            .insert(metadata::START_VALUE.to_string(), entry.start_value.clone());
-        if let Some(minutes) = &entry.duration_minutes {
             release
                 .metadata
-                .insert(metadata::DURATION.to_string(), minutes.clone());
+                .insert(metadata::DEADEND.to_string(), true.to_string());
+            release
+                .metadata
+                .insert(metadata::DEADEND_REASON.to_string(), reason.to_string());
+        }
+    }
+
+    fn inject_throttling_params(updates: &metadata::Updates, release: &mut CincinnatiPayload) {
+        for entry in &updates.rollouts {
+            if entry.version != release.version {
+                continue;
+            }
+
+            release
+                .metadata
+                .insert(metadata::START_EPOCH.to_string(), entry.start_epoch.clone());
+            release
+                .metadata
+                .insert(metadata::START_VALUE.to_string(), entry.start_value.clone());
+            if let Some(minutes) = &entry.duration_minutes {
+                release
+                    .metadata
+                    .insert(metadata::DURATION.to_string(), minutes.clone());
+            }
         }
     }
 }
