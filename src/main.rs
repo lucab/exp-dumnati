@@ -57,7 +57,7 @@ fn main() -> Fallible<()> {
     trace!("starting with config: {:#?}", opts);
 
     let sys = actix::System::new("dumnati");
-    let (port, _param, _path) = opts.split();
+    let (_port, _param, _path) = opts.split();
 
     let scraper_addr = scraper::Scraper::new("testing")?.start();
 
@@ -105,15 +105,6 @@ fn main() -> Fallible<()> {
             .route("/metrics", Method::GET, metrics::serve_metrics)
     })
     .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 9081))?
-    .start();
-
-    // Legacy combined service.
-    server::new(move || {
-        App::with_state(service_state.clone())
-            .middleware(Logger::default())
-            .route("/v1/graph", Method::GET, serve_graph)
-    })
-    .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), port))?
     .start();
 
     sys.run();
