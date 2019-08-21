@@ -128,7 +128,7 @@ pub(crate) struct AppState {
 
 pub(crate) fn serve_graph(
     req: HttpRequest<AppState>,
-) -> Box<Future<Item = HttpResponse, Error = Error>> {
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     record_metrics(&req);
 
     let wariness = compute_wariness(&req.query());

@@ -9,7 +9,7 @@ use prometheus;
 /// Serve metrics requests (Prometheus textual format).
 pub(crate) fn serve_metrics(
     _req: HttpRequest<AppState>,
-) -> Box<Future<Item = HttpResponse, Error = failure::Error>> {
+) -> Box<dyn Future<Item = HttpResponse, Error = failure::Error>> {
     use prometheus::Encoder;
 
     let resp = future::ok(prometheus::default_registry().gather())
