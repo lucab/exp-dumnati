@@ -57,7 +57,7 @@ fn main() -> Fallible<()> {
     trace!("starting with config: {:#?}", opts);
 
     let sys = actix::System::new("dumnati");
-    let (_port, _param, _path) = opts.split();
+    let (_param, _path) = opts.split();
 
     let scraper_addr = scraper::Scraper::new("testing")?.start();
 
@@ -200,10 +200,6 @@ pub(crate) fn record_metrics(req: &HttpRequest<AppState>) {
 
 #[derive(Debug, StructOpt)]
 pub(crate) struct CliOptions {
-    /// Port to which the server will bind.
-    #[structopt(short = "p", long = "port", default_value = "9876")]
-    port: u16,
-
     /// Client parameter for current version.
     #[structopt(short = "c", long = "client-parameter", default_value = "current_os")]
     client_param: String,
@@ -214,7 +210,7 @@ pub(crate) struct CliOptions {
 }
 
 impl CliOptions {
-    pub(crate) fn split(self) -> (u16, String, String) {
-        (self.port, self.client_param, self.payload)
+    pub(crate) fn split(self) -> (String, String) {
+        (self.client_param, self.payload)
     }
 }
