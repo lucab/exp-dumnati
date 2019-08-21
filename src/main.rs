@@ -33,17 +33,17 @@ use structopt::StructOpt;
 
 lazy_static::lazy_static! {
     static ref V1_GRAPH_INCOMING_REQS: IntCounter = register_int_counter!(opts!(
-        "dumnati_v1_graph_incoming_requests_total",
+        "dumnati_pe_v1_graph_incoming_requests_total",
         "Total number of incoming HTTP client request to /v1/graph"
     ))
     .unwrap();
     static ref UNIQUE_IDS: IntCounter = register_int_counter!(opts!(
-        "dumnati_v1_graph_unique_uuids_total",
+        "dumnati_pe_v1_graph_unique_uuids_total",
         "Total number of unique node UUIDs (per-instance Bloom filter)."
     ))
     .unwrap();
     static ref ROLLOUT_WARINESS: Histogram = register_histogram!(
-        "dumnati_v1_graph_rollout_wariness",
+        "dumnati_pe_v1_graph_rollout_wariness",
         "Per-request rollout wariness.",
         prometheus::linear_buckets(0.0, 0.1, 11).unwrap()
     )

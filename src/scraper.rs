@@ -8,19 +8,19 @@ use reqwest::Method;
 
 lazy_static::lazy_static! {
     static ref GRAPH_FINAL_EDGES: IntGauge = register_int_gauge!(opts!(
-        "dumnati_scraper_graph_final_edges",
+        "dumnati_gb_scraper_graph_final_edges",
         "Number of edges in the cached graph, after processing"
     )).unwrap();
     static ref GRAPH_FINAL_RELEASES: IntGauge = register_int_gauge!(opts!(
-        "dumnati_scraper_graph_final_releases",
+        "dumnati_gb_scraper_graph_final_releases",
         "Number of releases in the cached graph, after processing"
     )).unwrap();
     static ref LAST_REFRESH: IntGauge = register_int_gauge!(opts!(
-        "dumnati_scraper_graph_last_refresh_timestamp",
+        "dumnati_gb_scraper_graph_last_refresh_timestamp",
         "UTC timestamp of last graph refresh"
     )).unwrap();
     static ref UPSTREAM_SCRAPES: IntCounter = register_int_counter!(opts!(
-        "dumnati_scraper_upstream_scrapes_total",
+        "dumnati_gb_scraper_upstream_scrapes_total",
         "Total number of upstream scrapes"
     ))
     .unwrap();
