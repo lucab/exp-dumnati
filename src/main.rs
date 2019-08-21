@@ -62,13 +62,24 @@ fn main() -> Fallible<()> {
     let scraper_addr = scraper::Scraper::new("testing")?.start();
 
     let node_population = Arc::new(cbloom::Filter::new(10 * 1024 * 1024, 1_000_000));
-    let app_state = AppState {
+    let service_state = AppState {
         scraper_addr,
         population: Arc::clone(&node_population),
     };
+    let status_state = service_state.clone();
 
+    // Status service.
     server::new(move || {
-        App::with_state(app_state.clone())
+        App::with_state(status_state.clone())
+            .middleware(Logger::default())
+            .route("/metrics", Method::GET, metrics::serve_metrics)
+    })
+    .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 9090))?
+    .start();
+
+    // Main service.
+    server::new(move || {
+        App::with_state(service_state.clone())
             .middleware(Logger::default())
             .route("/v1/graph", Method::GET, serve_graph)
             .route(
