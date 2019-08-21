@@ -94,11 +94,6 @@ fn main() -> Fallible<()> {
         App::with_state(pe_service.clone())
             .middleware(Logger::default())
             .route("/v1/graph", Method::GET, serve_graph)
-            .route(
-                "/private-will-move/metrics",
-                Method::GET,
-                metrics::serve_metrics,
-            )
     })
     .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 8081))?
     .start();
@@ -117,11 +112,6 @@ fn main() -> Fallible<()> {
         App::with_state(service_state.clone())
             .middleware(Logger::default())
             .route("/v1/graph", Method::GET, serve_graph)
-            .route(
-                "/private-will-move/metrics",
-                Method::GET,
-                metrics::serve_metrics,
-            )
     })
     .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), port))?
     .start();
