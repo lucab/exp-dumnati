@@ -205,7 +205,7 @@ pub(crate) struct CliOptions {
     client_param: String,
 
     /// Path to release payload.
-    #[structopt(parse(from_str))]
+    #[structopt(parse(from_str), default_value = "/dev/null")]
     payload: String,
 }
 
