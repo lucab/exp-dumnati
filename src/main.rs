@@ -66,18 +66,53 @@ fn main() -> Fallible<()> {
         scraper_addr,
         population: Arc::clone(&node_population),
     };
-    let status_state = service_state.clone();
+    let gb_service = service_state.clone();
+    let gb_status = service_state.clone();
+    let pe_service = service_state.clone();
+    let pe_status = service_state.clone();
 
-    // Status service.
+    // Graph-builder service.
     server::new(move || {
-        App::with_state(status_state.clone())
+        App::with_state(gb_service.clone())
+            .middleware(Logger::default())
+            .route("/v1/graph", Method::GET, serve_graph)
+    })
+    .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 8080))?
+    .start();
+
+    // Graph-builder status service.
+    server::new(move || {
+        App::with_state(gb_status.clone())
             .middleware(Logger::default())
             .route("/metrics", Method::GET, metrics::serve_metrics)
     })
-    .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 9090))?
+    .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 9080))?
     .start();
 
-    // Main service.
+    // Policy-engine service.
+    server::new(move || {
+        App::with_state(pe_service.clone())
+            .middleware(Logger::default())
+            .route("/v1/graph", Method::GET, serve_graph)
+            .route(
+                "/private-will-move/metrics",
+                Method::GET,
+                metrics::serve_metrics,
+            )
+    })
+    .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 8081))?
+    .start();
+
+    // Policy-engine status service.
+    server::new(move || {
+        App::with_state(pe_status.clone())
+            .middleware(Logger::default())
+            .route("/metrics", Method::GET, metrics::serve_metrics)
+    })
+    .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 9081))?
+    .start();
+
+    // Legacy combined service.
     server::new(move || {
         App::with_state(service_state.clone())
             .middleware(Logger::default())
