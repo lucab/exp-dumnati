@@ -57,7 +57,7 @@ fn main() -> Fallible<()> {
     trace!("starting with config: {:#?}", opts);
 
     let sys = actix::System::new("dumnati");
-    let (_param, _path) = opts.split();
+    let _path = opts.split();
 
     let scraper_addr = scraper::Scraper::new("testing")?.start();
 
@@ -247,9 +247,9 @@ pub(crate) fn pe_record_metrics(req: &HttpRequest<AppState>) {
 
 #[derive(Debug, StructOpt)]
 pub(crate) struct CliOptions {
-    /// Client parameter for current version.
-    #[structopt(short = "c", long = "client-parameter", default_value = "current_os")]
-    client_param: String,
+    /// Path to configuration file.
+    #[structopt(short = "c")]
+    pub config_path: Option<String>,
 
     /// Path to release payload.
     #[structopt(parse(from_str), default_value = "/dev/null")]
@@ -257,7 +257,7 @@ pub(crate) struct CliOptions {
 }
 
 impl CliOptions {
-    pub(crate) fn split(self) -> (String, String) {
-        (self.client_param, self.payload)
+    pub(crate) fn split(self) -> String {
+        self.payload
     }
 }
