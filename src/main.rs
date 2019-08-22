@@ -75,7 +75,7 @@ fn main() -> Fallible<()> {
     server::new(move || {
         App::with_state(gb_service.clone())
             .middleware(Logger::default())
-            .route("/v1/graph", Method::GET, serve_graph)
+            .route("/v1/graph", Method::GET, gb_serve_graph)
     })
     .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 8080))?
     .start();
@@ -93,7 +93,7 @@ fn main() -> Fallible<()> {
     server::new(move || {
         App::with_state(pe_service.clone())
             .middleware(Logger::default())
-            .route("/v1/graph", Method::GET, serve_graph)
+            .route("/v1/graph", Method::GET, pe_serve_graph)
     })
     .bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 8081))?
     .start();
@@ -117,10 +117,56 @@ pub(crate) struct AppState {
     population: Arc<cbloom::Filter>,
 }
 
-pub(crate) fn serve_graph(
+pub(crate) fn gb_serve_graph(
     req: HttpRequest<AppState>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    record_metrics(&req);
+    let basearch = req
+        .query()
+        .get("basearch")
+        .map(String::from)
+        .unwrap_or_default();
+    let stream = req
+        .query()
+        .get("stream")
+        .map(String::from)
+        .unwrap_or_default();
+
+    let cached_graph = req
+        .state()
+        .scraper_addr
+        .send(scraper::GetCachedGraph { stream })
+        .flatten();
+
+    let resp = cached_graph
+        .and_then(|graph| policy::pick_basearch(graph, basearch))
+        .map(|graph| policy::filter_deadends(graph))
+        .and_then(|graph| {
+            serde_json::to_string_pretty(&graph).map_err(|e| failure::format_err!("{}", e))
+        })
+        .map(|json| {
+            HttpResponse::Ok()
+                .content_type("application/json")
+                .body(json)
+        });
+
+    Box::new(resp)
+}
+
+pub(crate) fn pe_serve_graph(
+    req: HttpRequest<AppState>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    pe_record_metrics(&req);
+
+    let basearch = req
+        .query()
+        .get("basearch")
+        .map(String::from)
+        .unwrap_or_default();
+    let stream = req
+        .query()
+        .get("stream")
+        .map(String::from)
+        .unwrap_or_default();
 
     let wariness = compute_wariness(&req.query());
     ROLLOUT_WARINESS.observe(wariness);
@@ -128,10 +174,11 @@ pub(crate) fn serve_graph(
     let cached_graph = req
         .state()
         .scraper_addr
-        .send(scraper::GetCachedGraph::default())
+        .send(scraper::GetCachedGraph { stream })
         .flatten();
 
     let resp = cached_graph
+        .and_then(|graph| policy::pick_basearch(graph, basearch))
         .map(move |graph| policy::throttle_rollouts(graph, wariness))
         .map(|graph| policy::filter_deadends(graph))
         .and_then(|graph| {
@@ -180,7 +227,7 @@ fn compute_wariness(params: &HashMap<String, String>) -> f64 {
     wariness
 }
 
-pub(crate) fn record_metrics(req: &HttpRequest<AppState>) {
+pub(crate) fn pe_record_metrics(req: &HttpRequest<AppState>) {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 

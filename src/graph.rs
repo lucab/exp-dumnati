@@ -34,16 +34,21 @@ impl Graph {
             .into_iter()
             .enumerate()
             .map(|(age_index, entry)| {
-                // XXX(lucab): may panic, this should match on arch instead.
-                let payload = entry.commits[0].checksum.clone();
                 let mut current = CincinnatiPayload {
                     version: entry.version,
-                    payload,
+                    payload: "".to_string(),
                     metadata: hashmap! {
-                        metadata::SCHEME.to_string() => "checksum".to_string(),
                         metadata::AGE_INDEX.to_string() => age_index.to_string(),
                     },
                 };
+                for commit in entry.commits {
+                    if commit.architecture.is_empty() || commit.checksum.is_empty() {
+                        continue;
+                    }
+                    let key = format!("{}.{}", metadata::ARCH_PREFIX, commit.architecture);
+                    let value = commit.checksum;
+                    current.metadata.insert(key, value);
+                }
 
                 // Augment with dead-ends metadata.
                 Self::inject_deadend_reason(&updates, &mut current);

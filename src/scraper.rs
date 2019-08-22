@@ -140,14 +140,12 @@ impl Handler<RefreshTick> for Scraper {
 }
 
 pub(crate) struct GetCachedGraph {
-    pub(crate) basearch: String,
     pub(crate) stream: String,
 }
 
 impl Default for GetCachedGraph {
     fn default() -> Self {
         Self {
-            basearch: "x86_64".to_string(),
             stream: "testing".to_string(),
         }
     }
@@ -160,9 +158,13 @@ impl Message for GetCachedGraph {
 impl Handler<GetCachedGraph> for Scraper {
     type Result = ResponseActFuture<Self, graph::Graph, Error>;
     fn handle(&mut self, msg: GetCachedGraph, _ctx: &mut Self::Context) -> Self::Result {
-        assert_eq!(msg.basearch, "x86_64");
-        assert_eq!(msg.stream, "testing");
-
+        use failure::format_err;
+        if msg.stream != "testing" {
+            return Box::new(actix::fut::err(format_err!(
+                "unexpected stream '{}'",
+                msg.stream
+            )));
+        }
         Box::new(actix::fut::ok(self.graph.clone()))
     }
 }

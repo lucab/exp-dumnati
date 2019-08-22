@@ -1,5 +1,6 @@
 use crate::graph::Graph;
 use crate::metadata;
+use failure::{bail, Fallible};
 
 /// Prune outgoing edges from "deadend" nodes.
 pub fn filter_deadends(input: Graph) -> Graph {
@@ -21,6 +22,30 @@ pub fn filter_deadends(input: Graph) -> Graph {
     graph.edges.shrink_to_fit();
 
     graph
+}
+
+/// Pick relevant payload for requested basearch.
+pub fn pick_basearch(input: Graph, basearch: String) -> Fallible<Graph> {
+    let mut graph = input;
+    let key = format!("{}.{}", metadata::ARCH_PREFIX, &basearch);
+
+    if basearch != "x86_64" {
+        bail!("unexpected basearch '{}", basearch);
+    }
+
+    for mut release in &mut graph.nodes {
+        if let Some(payload) = release.metadata.remove(&key) {
+            release.payload = payload;
+            release
+                .metadata
+                .insert(metadata::SCHEME.to_string(), "checksum".to_string());
+        }
+        release
+            .metadata
+            .retain(|k, _| !k.starts_with(metadata::ARCH_PREFIX));
+    }
+
+    Ok(graph)
 }
 
 /// Conditionally prune incoming edges towards throttled rollouts.

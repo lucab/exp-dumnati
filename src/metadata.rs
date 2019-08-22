@@ -12,6 +12,7 @@ pub static STREAM_JSON: &str = "https://builds.coreos.fedoraproject.org/updates/
 pub static SCHEME: &str = "org.fedoraproject.coreos.scheme";
 
 pub static AGE_INDEX: &str = "org.fedoraproject.coreos.releases.age_index";
+pub static ARCH_PREFIX: &str = "org.fedoraproject.coreos.releases.arch";
 
 pub static DEADEND: &str = "org.fedoraproject.coreos.updates.deadend";
 pub static DEADEND_REASON: &str = "org.fedoraproject.coreos.updates.deadend_reason";
