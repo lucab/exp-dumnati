@@ -53,6 +53,9 @@ impl Graph {
                 // Augment with dead-ends metadata.
                 Self::inject_deadend_reason(&updates, &mut current);
 
+                // Augment with barriers metadata.
+                Self::inject_barrier_reason(&updates, &mut current);
+
                 // Augment with rollouts metadata.
                 Self::inject_throttling_params(&updates, &mut current);
 
@@ -60,11 +63,68 @@ impl Graph {
             })
             .collect();
 
-        // Synthesize an update graph.
-        let edges = vec![(0, 1), (0, 2), (1, 2)];
+        // Compute the update graph.
+        let edges = Self::compute_edges(&nodes)?;
 
         let graph = Graph { nodes, edges };
         Ok(graph)
+    }
+
+    fn compute_edges(nodes: &Vec<CincinnatiPayload>) -> Fallible<Vec<(u64, u64)>> {
+        use std::collections::BTreeSet;
+
+        // Collect all rollouts.
+        let mut rollouts = BTreeSet::<u64>::new();
+        for (index, release) in nodes.iter().enumerate() {
+            if release.metadata.contains_key(metadata::ROLLOUT) {
+                rollouts.insert(index as u64);
+            }
+        }
+
+        // Collect all barriers.
+        let mut barriers = BTreeSet::<u64>::new();
+        for (index, release) in nodes.iter().enumerate() {
+            if release.metadata.contains_key(metadata::BARRIER) {
+                barriers.insert(index as u64);
+            }
+        }
+
+        // Add edges targeting rollouts, back till the last barrier.
+        let mut edges = vec![];
+        for (index, _release) in nodes.iter().enumerate().rev() {
+            let age = index as u64;
+            if !rollouts.contains(&age) {
+                continue;
+            }
+
+            let last_barrier = barriers.iter().last().cloned().unwrap_or(0);
+            for i in last_barrier..age {
+                edges.push((i, age))
+            }
+        }
+
+        Ok(edges)
+    }
+
+    fn inject_barrier_reason(updates: &metadata::Updates, release: &mut CincinnatiPayload) {
+        for entry in &updates.barriers {
+            if entry.version != release.version {
+                continue;
+            }
+
+            let reason = if entry.reason.is_empty() {
+                "generic"
+            } else {
+                &entry.reason
+            };
+
+            release
+                .metadata
+                .insert(metadata::BARRIER.to_string(), true.to_string());
+            release
+                .metadata
+                .insert(metadata::BARRIER_REASON.to_string(), reason.to_string());
+        }
     }
 
     fn inject_deadend_reason(updates: &metadata::Updates, release: &mut CincinnatiPayload) {
@@ -94,6 +154,9 @@ impl Graph {
                 continue;
             }
 
+            release
+                .metadata
+                .insert(metadata::ROLLOUT.to_string(), true.to_string());
             release
                 .metadata
                 .insert(metadata::START_EPOCH.to_string(), entry.start_epoch.clone());

@@ -14,8 +14,11 @@ pub static SCHEME: &str = "org.fedoraproject.coreos.scheme";
 pub static AGE_INDEX: &str = "org.fedoraproject.coreos.releases.age_index";
 pub static ARCH_PREFIX: &str = "org.fedoraproject.coreos.releases.arch";
 
+pub static BARRIER: &str = "org.fedoraproject.coreos.updates.barrier";
+pub static BARRIER_REASON: &str = "org.fedoraproject.coreos.updates.barrier_reason";
 pub static DEADEND: &str = "org.fedoraproject.coreos.updates.deadend";
 pub static DEADEND_REASON: &str = "org.fedoraproject.coreos.updates.deadend_reason";
+pub static ROLLOUT: &str = "org.fedoraproject.coreos.updates.rollout";
 pub static DURATION: &str = "org.fedoraproject.coreos.updates.duration_minutes";
 pub static START_EPOCH: &str = "org.fedoraproject.coreos.updates.start_epoch";
 pub static START_VALUE: &str = "org.fedoraproject.coreos.updates.start_value";
