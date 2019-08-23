@@ -54,10 +54,9 @@ fn main() -> Fallible<()> {
     env_logger::Builder::from_default_env().try_init()?;
 
     let opts = CliOptions::from_args();
-    trace!("starting with config: {:#?}", opts);
+    trace!("started with CLI options: {:#?}", opts);
 
     let sys = actix::System::new("dumnati");
-    let _path = opts.split();
 
     let scraper_addr = scraper::Scraper::new("testing")?.start();
 
@@ -250,14 +249,4 @@ pub(crate) struct CliOptions {
     /// Path to configuration file.
     #[structopt(short = "c")]
     pub config_path: Option<String>,
-
-    /// Path to release payload.
-    #[structopt(parse(from_str), default_value = "/dev/null")]
-    payload: String,
-}
-
-impl CliOptions {
-    pub(crate) fn split(self) -> String {
-        self.payload
-    }
 }
