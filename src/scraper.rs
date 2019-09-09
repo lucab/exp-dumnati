@@ -74,14 +74,13 @@ impl Scraper {
     }
 
     /// Fetch updates metadata.
-    fn fetch_updates(&self) -> impl Future<Item = metadata::Updates, Error = Error> {
+    fn fetch_updates(&self) -> impl Future<Item = metadata::UpdatesJSON, Error = Error> {
         let url = self.stream_metadata_url.clone();
         let req = self.new_request(Method::GET, url);
         future::result(req)
             .and_then(|req| req.send().from_err())
             .and_then(|resp| resp.error_for_status().map_err(Error::from))
             .and_then(|mut resp| resp.json::<metadata::UpdatesJSON>().from_err())
-            .map(|json| json.updates)
     }
 
     /// Combine release-index and updates metadata.

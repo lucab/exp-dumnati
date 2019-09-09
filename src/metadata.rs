@@ -7,7 +7,7 @@ pub static RELEASES_JSON: &str =
     "https://builds.coreos.fedoraproject.org/prod/streams/${stream}/releases.json";
 
 /// Templated URL for stream metadata.
-pub static STREAM_JSON: &str = "https://builds.coreos.fedoraproject.org/updates/${stream}.old.json";
+pub static STREAM_JSON: &str = "https://builds.coreos.fedoraproject.org/updates/${stream}.json";
 
 pub static SCHEME: &str = "org.fedoraproject.coreos.scheme";
 
@@ -45,32 +45,39 @@ pub struct ReleaseCommit {
 /// Fedora CoreOS updates metadata
 #[derive(Debug, Deserialize)]
 pub struct UpdatesJSON {
-    pub updates: Updates,
+    pub stream: String,
+    pub releases: Vec<ReleaseUpdate>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Updates {
-    pub barriers: Vec<UpdateBarrier>,
-    pub deadends: Vec<UpdateDeadend>,
-    pub rollouts: Vec<UpdateRollout>,
+pub struct ReleaseUpdate {
+    pub version: String,
+    pub metadata: UpdateMetadata,
+}
+
+#[derive(Debug, Deserialize)]
+pub enum UpdateMetadata {
+    #[serde(rename = "barrier")]
+    Barrier(UpdateBarrier),
+    #[serde(rename = "deadend")]
+    Deadend(UpdateDeadend),
+    #[serde(rename = "rollout")]
+    Rollout(UpdateRollout),
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateBarrier {
-    pub version: String,
     pub reason: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateDeadend {
-    pub version: String,
     pub reason: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateRollout {
-    pub version: String,
-    pub start_epoch: String,
-    pub start_value: String,
-    pub duration_minutes: Option<String>,
+    pub start_epoch: i64,
+    pub start_percentage: f64,
+    pub duration_minutes: Option<u64>,
 }

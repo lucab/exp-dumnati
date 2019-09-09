@@ -28,7 +28,7 @@ impl Default for Graph {
 impl Graph {
     pub fn from_metadata(
         releases: Vec<metadata::Release>,
-        updates: metadata::Updates,
+        updates: metadata::UpdatesJSON,
     ) -> Fallible<Self> {
         let nodes = releases
             .into_iter()
@@ -106,67 +106,75 @@ impl Graph {
         Ok(edges)
     }
 
-    fn inject_barrier_reason(updates: &metadata::Updates, release: &mut CincinnatiPayload) {
-        for entry in &updates.barriers {
+    fn inject_barrier_reason(updates: &metadata::UpdatesJSON, release: &mut CincinnatiPayload) {
+        for entry in &updates.releases {
             if entry.version != release.version {
                 continue;
             }
 
-            let reason = if entry.reason.is_empty() {
-                "generic"
-            } else {
-                &entry.reason
-            };
+            if let metadata::UpdateMetadata::Barrier(barrier) = &entry.metadata {
+                let reason = if barrier.reason.is_empty() {
+                    "generic"
+                } else {
+                    &barrier.reason
+                };
 
-            release
-                .metadata
-                .insert(metadata::BARRIER.to_string(), true.to_string());
-            release
-                .metadata
-                .insert(metadata::BARRIER_REASON.to_string(), reason.to_string());
-        }
-    }
-
-    fn inject_deadend_reason(updates: &metadata::Updates, release: &mut CincinnatiPayload) {
-        for entry in &updates.deadends {
-            if entry.version != release.version {
-                continue;
-            }
-
-            let reason = if entry.reason.is_empty() {
-                "generic"
-            } else {
-                &entry.reason
-            };
-
-            release
-                .metadata
-                .insert(metadata::DEADEND.to_string(), true.to_string());
-            release
-                .metadata
-                .insert(metadata::DEADEND_REASON.to_string(), reason.to_string());
-        }
-    }
-
-    fn inject_throttling_params(updates: &metadata::Updates, release: &mut CincinnatiPayload) {
-        for entry in &updates.rollouts {
-            if entry.version != release.version {
-                continue;
-            }
-
-            release
-                .metadata
-                .insert(metadata::ROLLOUT.to_string(), true.to_string());
-            release
-                .metadata
-                .insert(metadata::START_EPOCH.to_string(), entry.start_epoch.clone());
-            release
-                .metadata
-                .insert(metadata::START_VALUE.to_string(), entry.start_value.clone());
-            if let Some(minutes) = &entry.duration_minutes {
                 release
                     .metadata
-                    .insert(metadata::DURATION.to_string(), minutes.clone());
+                    .insert(metadata::BARRIER.to_string(), true.to_string());
+                release
+                    .metadata
+                    .insert(metadata::BARRIER_REASON.to_string(), reason.to_string());
+            }
+        }
+    }
+
+    fn inject_deadend_reason(updates: &metadata::UpdatesJSON, release: &mut CincinnatiPayload) {
+        for entry in &updates.releases {
+            if entry.version != release.version {
+                continue;
+            }
+
+            if let metadata::UpdateMetadata::Deadend(deadend) = &entry.metadata {
+                let reason = if deadend.reason.is_empty() {
+                    "generic"
+                } else {
+                    &deadend.reason
+                };
+
+                release
+                    .metadata
+                    .insert(metadata::DEADEND.to_string(), true.to_string());
+                release
+                    .metadata
+                    .insert(metadata::DEADEND_REASON.to_string(), reason.to_string());
+            }
+        }
+    }
+
+    fn inject_throttling_params(updates: &metadata::UpdatesJSON, release: &mut CincinnatiPayload) {
+        for entry in &updates.releases {
+            if entry.version != release.version {
+                continue;
+            }
+
+            if let metadata::UpdateMetadata::Rollout(rollout) = &entry.metadata {
+                release
+                    .metadata
+                    .insert(metadata::ROLLOUT.to_string(), true.to_string());
+                release.metadata.insert(
+                    metadata::START_EPOCH.to_string(),
+                    rollout.start_epoch.to_string(),
+                );
+                release.metadata.insert(
+                    metadata::START_VALUE.to_string(),
+                    rollout.start_percentage.to_string(),
+                );
+                if let Some(minutes) = &rollout.duration_minutes {
+                    release
+                        .metadata
+                        .insert(metadata::DURATION.to_string(), minutes.to_string());
+                }
             }
         }
     }
