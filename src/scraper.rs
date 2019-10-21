@@ -113,7 +113,7 @@ impl Message for RefreshTick {
 impl Handler<RefreshTick> for Scraper {
     type Result = ResponseActFuture<Self, (), Error>;
 
-    fn handle(&mut self, _msg: RefreshTick, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: RefreshTick, _ctx: &mut Self::Context) -> Self::Result {
         UPSTREAM_SCRAPES.inc();
 
         let updates = self.assemble_graph();
@@ -132,9 +132,7 @@ impl Handler<RefreshTick> for Scraper {
                 actix::fut::ok(())
             });
 
-        ctx.wait(update_graph);
-
-        Box::new(actix::fut::ok(()))
+        Box::new(update_graph)
     }
 }
 
