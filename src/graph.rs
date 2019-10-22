@@ -163,11 +163,9 @@ impl Graph {
                     .metadata
                     .insert(metadata::ROLLOUT.to_string(), true.to_string());
                 if let Some(val) = rollout.start_epoch {
-
-                release.metadata.insert(
-                    metadata::START_EPOCH.to_string(),
-                    val.to_string(),
-                );
+                    release
+                        .metadata
+                        .insert(metadata::START_EPOCH.to_string(), val.to_string());
                 }
                 if let Some(val) = rollout.start_percentage {
                     release
