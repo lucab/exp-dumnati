@@ -77,7 +77,7 @@ pub struct UpdateDeadend {
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateRollout {
-    pub start_epoch: i64,
-    pub start_percentage: f64,
+    pub start_epoch: Option<i64>,
+    pub start_percentage: Option<f64>,
     pub duration_minutes: Option<u64>,
 }
