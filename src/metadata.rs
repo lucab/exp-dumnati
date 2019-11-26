@@ -56,13 +56,10 @@ pub struct ReleaseUpdate {
 }
 
 #[derive(Debug, Deserialize)]
-pub enum UpdateMetadata {
-    #[serde(rename = "barrier")]
-    Barrier(UpdateBarrier),
-    #[serde(rename = "deadend")]
-    Deadend(UpdateDeadend),
-    #[serde(rename = "rollout")]
-    Rollout(UpdateRollout),
+pub struct UpdateMetadata {
+    pub barrier: Option<UpdateBarrier>,
+    pub deadend: Option<UpdateDeadend>,
+    pub rollout: Option<UpdateRollout>,
 }
 
 #[derive(Debug, Deserialize)]

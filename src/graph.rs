@@ -73,17 +73,13 @@ impl Graph {
     fn compute_edges(nodes: &Vec<CincinnatiPayload>) -> Fallible<Vec<(u64, u64)>> {
         use std::collections::BTreeSet;
 
-        // Collect all rollouts.
+        // Collect all rollouts and barriers.
         let mut rollouts = BTreeSet::<u64>::new();
+        let mut barriers = BTreeSet::<u64>::new();
         for (index, release) in nodes.iter().enumerate() {
             if release.metadata.contains_key(metadata::ROLLOUT) {
                 rollouts.insert(index as u64);
             }
-        }
-
-        // Collect all barriers.
-        let mut barriers = BTreeSet::<u64>::new();
-        for (index, release) in nodes.iter().enumerate() {
             if release.metadata.contains_key(metadata::BARRIER) {
                 barriers.insert(index as u64);
             }
@@ -103,6 +99,15 @@ impl Graph {
             }
         }
 
+        // Add edges targeting barriers, back till the previous barrier.
+        let mut start = 0;
+        for target in barriers {
+            for i in start..target {
+                edges.push((i, target))
+            }
+            start = target;
+        }
+
         Ok(edges)
     }
 
@@ -112,7 +117,7 @@ impl Graph {
                 continue;
             }
 
-            if let metadata::UpdateMetadata::Barrier(barrier) = &entry.metadata {
+            if let Some(barrier) = &entry.metadata.barrier {
                 let reason = if barrier.reason.is_empty() {
                     "generic"
                 } else {
@@ -135,7 +140,7 @@ impl Graph {
                 continue;
             }
 
-            if let metadata::UpdateMetadata::Deadend(deadend) = &entry.metadata {
+            if let Some(deadend) = &entry.metadata.deadend {
                 let reason = if deadend.reason.is_empty() {
                     "generic"
                 } else {
@@ -158,7 +163,7 @@ impl Graph {
                 continue;
             }
 
-            if let metadata::UpdateMetadata::Rollout(rollout) = &entry.metadata {
+            if let Some(rollout) = &entry.metadata.rollout {
                 release
                     .metadata
                     .insert(metadata::ROLLOUT.to_string(), true.to_string());
